@@ -5,12 +5,10 @@
 ![Platform: ESP32-C3](https://img.shields.io/badge/platform-ESP32--C3-blue)
 ![Framework: Arduino](https://img.shields.io/badge/framework-Arduino-00979D)
 ![Companion: Chronos](https://img.shields.io/badge/companion-Chronos%20(Android)-green)
-![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)
 
 Bike HUD shows the time, phone battery, turn-by-turn navigation, notifications, and incoming calls on a compact 0.96" OLED mounted to your handlebar. All data comes from your Android phone over Bluetooth Low Energy via the [Chronos](https://chronos.ke) app. There is no Wi-Fi, no web server, and no cloud dependency.
 
-<!-- Add a photo or GIF of the finished build here, e.g.  -->
-![Bike HUD](docs/images/hud.jpg)
+![Bike HUD](docs/hud.jpg)
 ---
 
 ## Table of Contents
@@ -40,10 +38,10 @@ Bike HUD shows the time, phone battery, turn-by-turn navigation, notifications, 
 | **Phone battery** | Shows the connected phone's battery percentage and charging state. |
 | **Navigation** | Turn icon and text directions while a route is active on the phone. |
 | **Notifications** | Full-screen alert when idle; a compact toast in the bottom-right corner while navigating. |
-| **Incoming calls** | Pulsing full-screen alert with the caller's name, or a compact banner while navigating. |
-| **Missed calls** | Explicitly labelled "MISSED CALL" so they are not confused with ordinary notifications. |
-| **Throttled rendering** | Redraws at up to ~15 FPS, and only when something has changed, keeping the display smooth and the MCU cool. |
-| **Stale-call timeout** | If the phone never sends a "call ended" event, the ringing screen clears itself after 2 minutes. |
+| **Incoming calls** | Pulsing full-screen alert with the caller's name, or a compact banner while navigating. The display prompts you to answer on your phone. |
+| **Missed calls** | Recognized phone notifications are labelled "MISSED CALL". |
+| **Throttled rendering** | Display updates are limited to about 15 FPS and occur when state changes or an animation needs a frame. |
+| **Stale-call timeout** | A ringing screen clears after 2 minutes if no call-ended event arrives. |
 | **Text sanitising** | Unicode arrows and symbols from navigation apps are mapped to ASCII equivalents the SSD1306 font can render. |
 
 ---
@@ -59,7 +57,7 @@ Bike HUD shows the time, phone battery, turn-by-turn navigation, notifications, 
 | 4 | Female-to-female jumper wires | Or solder directly for a more vibration-resistant build. |
 | 1 | USB-C cable | Programming and power. |
 
-The ESP32-C3 SuperMini is small enough to fit a handlebar enclosure while still handling BLE and OLED graphics comfortably. The SSD1306 is a widely available I²C display supported by the Adafruit GFX ecosystem.
+The ESP32-C3 SuperMini handles the BLE connection and OLED graphics. Board dimensions and pin labels can vary by manufacturer; check your specific board before wiring.
 
 ---
 
@@ -81,7 +79,7 @@ GPIO 21 ───────────────────►  SCL
 GPIO 20 ───────────────────►  SDA
 ```
 
-> **Pin note:** The I²C bus is initialised on GPIO 20 (SDA) and GPIO 21 (SCL), set in the firmware. These are not the board's default I²C pins, so if you change the wiring, update the `Wire.begin()` call to match.
+> **Pin note:** The firmware initializes I²C with GPIO 20 (SDA) and GPIO 21 (SCL). If you use different pins, update `Wire.begin()` in the sketch to match.
 
 > **Power the OLED from 3V3, not 5V.** Many OLED modules accept 5 V on VCC, but their I²C pull-up resistors are then tied to that rail. The ESP32-C3's GPIOs are 3.3 V only, so a 5 V pull-up can stress or damage the pins.
 
@@ -125,7 +123,7 @@ ChronosESP32 source: [github.com/fbiego/chronos-esp32](https://github.com/fbiego
 
 ### 5. Upload
 
-1. Open the firmware sketch from this repository in the Arduino IDE.
+1. Open [`code/BikeHUD_Chronos_NavCall.ino`](code/BikeHUD_Chronos_NavCall.ino) in the Arduino IDE.
 2. Click **Upload**.
 
 If the upload fails, hold the **BOOT** button while connecting the board over USB to enter the bootloader, then try again.
@@ -152,8 +150,8 @@ If the upload fails, hold the **BOOT** button while connecting the board over US
 
 1. Power the HUD over USB-C from a power bank or your vehicle's USB supply.
 2. Open Chronos and confirm the HUD shows as connected.
-3. Start a route in Google Maps. The HUD switches to the navigation screen automatically.
-4. Notifications and calls appear as overlays and clear themselves when dismissed or timed out.
+3. Start a route in a navigation app supported by Chronos. The HUD switches to the navigation screen when it receives navigation data.
+4. Notifications appear for about 5 seconds. Incoming-call alerts clear when an end event arrives, the BLE connection drops, or the 2-minute fallback timeout expires.
 
 ---
 
@@ -165,9 +163,9 @@ If the upload fails, hold the **BOOT** button while connecting the board over US
 | **Navigating** | Status bar on top, turn icon on the left, up to five lines of directions on the right. |
 | **Notification (idle)** | App name, title, message, and a shrinking progress bar showing time until auto-dismiss. |
 | **Notification (navigating)** | Navigation stays visible; a toast with the app name and a one-line preview appears bottom-right. |
-| **Incoming call (idle)** | Full-screen "INCOMING CALL", caller name, pulsing answer icon. |
+| **Incoming call (idle)** | Full-screen "INCOMING CALL", caller name, pulsing indicator, and a prompt to answer on the phone. |
 | **Incoming call (navigating)** | Directions remain on top; the lower half shows "CALL: [name]" with a pulsing "RINGING" indicator. |
-| **Missed call** | Notification screen shows "MISSED CALL" in place of the app name. |
+| **Missed call** | Recognized missed-call notification shows "MISSED CALL" in place of the app name. |
 | **No time sync** | "SYNC WITH CHRONOS" until the first time packet arrives. |
 
 ---
@@ -176,12 +174,10 @@ If the upload fails, hold the **BOOT** button while connecting the board over US
 
 The enclosure is a multi-part design that houses the ESP32-C3 SuperMini and the 0.96" OLED. It attaches to the handlebar with a split clamp and a 3-tab bayonet twist-lock mount, so the HUD can be removed without tools.
 
-<!-- Replace with your actual file names and a link to the CAD source if you want to share it. -->
+The repository includes these 3MF files:
 
-
-/stl
-├── <enclosure-body>.stl
-├── <enclosure-lid>.stl
+- [Base.3mf](stl/Base.3mf)
+- [Lid.3mf](stl/Lid.3mf)
 
 
 ### Print settings
@@ -191,16 +187,16 @@ The enclosure is a multi-part design that houses the ESP32-C3 SuperMini and the 
 | Material | PETG (or ASA/ABS) for UV and heat resistance outdoors |
 | Layer height | 0.2 mm |
 | Infill | 20–30 % |
-| Supports | Only where needed for the display window and bayonet tabs |
+| Supports | Determine in your slicer based on print orientation and your printer's capabilities |
 
 ### Assembly
 
-1. Solder the 4-pin header to the OLED if it is not already fitted.
+1. Fit or solder the 4-pin header to the OLED if it is not already installed.
 2. Wire the OLED to the ESP32-C3 as shown in [Wiring](#wiring).
 3. **Flash and test the electronics before closing the enclosure.**
 4. Seat the board and display in the body, with the OLED flush against its window.
 5. Route the USB-C cable through the cable exit.
-6. Close the enclosure and fasten it with the M3 screws.
+6. Close the enclosure and fasten it with four M3 screws. Check the fit and required screw length against your printed parts before final assembly.
 7. Fit the clamp to the handlebar, then twist-lock the HUD into the mount.
 
 > For outdoor use, keep the USB port facing downward and consider a drip loop in the cable. The enclosure is not rated as waterproof.
@@ -248,13 +244,13 @@ The display is refreshed only when `needRedraw` is set and at least `MIN_FRAME_M
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | OLED stays blank | Wrong I²C address, loose wiring, or swapped SDA/SCL | Run an I²C scanner sketch. SSD1306 modules are typically at `0x3C` or `0x3D`. Re-check SDA/SCL against [Wiring](#wiring). |
-| Board not detected / upload fails | Board not in bootloader mode | Hold **BOOT** while plugging in USB, then upload. The C3 SuperMini uses native USB, so no CH340/CP2102 driver is needed. |
+| Board not detected / upload fails | Board not in bootloader mode, or USB cable/port issue | Try a USB data cable and another port. If needed, hold **BOOT** while connecting USB, then upload. USB interface hardware varies by board revision; install its driver if required by the manufacturer. |
 | No Serial output | USB CDC disabled | Set **USB CDC On Boot: Enabled** and re-upload. |
 | "SYNC WITH CHRONOS" stays on screen | No time data received | Open Chronos, confirm the HUD is connected, and make sure phone Bluetooth is on. |
 | Notifications do not appear | Notification access not granted | Enable Notification Access for Chronos in Android settings. |
 | Navigation does not appear | No active route, or the nav packet has not arrived yet | Start navigation after the HUD is connected and allow a few seconds for the first packet. |
 | Connection drops while riding | Android battery optimisation is killing Chronos | Exclude Chronos from battery optimisation and allow background activity. |
-| Display redraws continuously at idle | `needRedraw` is being set every loop | Expected during call-pulse animations. At idle, check for code that sets `needRedraw` unconditionally. |
+| Display redraws continuously at idle | Firmware state is continually marking the display dirty | The call animation intentionally redraws while active. At idle, check for code that sets `needRedraw` unconditionally. |
 
 ---
 
@@ -275,3 +271,6 @@ Issues and pull requests are welcome. For larger changes, please open an issue f
 - [ChronosESP32](https://github.com/fbiego/chronos-esp32) by Felix Biego, the library that makes the phone link possible.
 - [Adafruit SSD1306](https://github.com/adafruit/Adafruit_SSD1306) and [Adafruit GFX](https://github.com/adafruit/Adafruit-GFX-Library) for display support.
 - [NimBLE-Arduino](https://github.com/h2zero/NimBLE-Arduino) by h2zero for the BLE stack.
+
+---
+
